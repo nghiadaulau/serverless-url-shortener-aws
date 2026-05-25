@@ -1,6 +1,7 @@
 import type { SQSEvent, SQSBatchResponse, SQSBatchItemFailure } from "aws-lambda";
 import { TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb, TABLE } from "../lib/db.js";
+import { pushClickUpdate } from "../lib/ws.js";
 
 // Tieu thu su kien link.clicked tu SQS, dem click vao DynamoDB.
 // - Idempotent: mot marker CLICK#<eventId> ghi kem trong CUNG transaction voi
@@ -54,6 +55,7 @@ export const handler = async (event: SQSEvent): Promise<SQSBatchResponse> => {
           })
         );
         console.log("counted", { code, id });
+        await pushClickUpdate(code); // day so moi xuong dashboard realtime
       } catch (e) {
         // Marker da ton tai -> transaction bi huy -> su kien trung, bo qua an toan.
         if ((e as { name?: string }).name === "TransactionCanceledException") {
