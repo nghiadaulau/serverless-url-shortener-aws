@@ -1,0 +1,34 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  serverless-url-shortener-aws — Part I, bai 01: ham Lambda dau tien + Function URL.
+
+Globals:
+  Function:
+    Runtime: nodejs22.x
+    Architectures:
+      - arm64
+    MemorySize: 128
+    Timeout: 5
+
+Resources:
+  HelloFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        Sourcemap: false
+        EntryPoints:
+          - hello.ts
+    Properties:
+      CodeUri: src/handlers
+      Handler: hello.handler
+      FunctionUrlConfig:
+        AuthType: NONE
+
+Outputs:
+  HelloFunctionUrl:
+    Description: "Function URL cua HelloFunction"
+    Value: !GetAtt HelloFunctionUrl.FunctionUrl

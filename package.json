@@ -1,0 +1,12 @@
+{
+  "name": "serverless-url-shortener-aws",
+  "version": "0.1.0",
+  "description": "URL shortener with realtime analytics, built serverless on AWS with SAM + TypeScript",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.145",
+    "@types/node": "^22.10.0",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.2"
+  }
+}

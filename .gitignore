@@ -1,0 +1,17 @@
+# dependencies
+node_modules/
+
+# SAM build artifacts
+.aws-sam/
+
+# TypeScript build output
+dist/
+
+# logs / local env
+*.log
+.env
+.env.*
+samconfig.toml
+
+# OS
+.DS_Store
