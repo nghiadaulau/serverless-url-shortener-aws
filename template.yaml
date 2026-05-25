@@ -45,6 +45,33 @@ Resources:
           Projection:
             ProjectionType: ALL
 
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: url-shortener-users
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      UserPoolId: !Ref UserPool
+      ClientName: url-shortener-client
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_ADMIN_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+
   HttpApi:
     Type: AWS::Serverless::HttpApi
     Properties:
@@ -57,6 +84,17 @@ Resources:
           - OPTIONS
         AllowHeaders:
           - content-type
+          - authorization
+      # JWT authorizer cho Cognito. KHONG dat DefaultAuthorizer de GET /{code}
+      # van public; chi gan authorizer cho route can bao ve.
+      Auth:
+        Authorizers:
+          CognitoAuthorizer:
+            IdentitySource: "$request.header.Authorization"
+            JwtConfiguration:
+              issuer: !Sub "https://cognito-idp.${AWS::Region}.amazonaws.com/${UserPool}"
+              audience:
+                - !Ref UserPoolClient
 
   CreateLinkFunction:
     Type: AWS::Serverless::Function
@@ -83,6 +121,8 @@ Resources:
             ApiId: !Ref HttpApi
             Path: /links
             Method: POST
+            Auth:
+              Authorizer: CognitoAuthorizer
 
   ResolveLinkFunction:
     Type: AWS::Serverless::Function
@@ -114,3 +154,7 @@ Outputs:
   ApiUrl:
     Description: "URL goc cua HTTP API ($default stage)"
     Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+  UserPoolId:
+    Value: !Ref UserPool
+  UserPoolClientId:
+    Value: !Ref UserPoolClient

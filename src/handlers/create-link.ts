@@ -1,4 +1,7 @@
-import type { APIGatewayProxyEventV2, APIGatewayProxyResultV2 } from "aws-lambda";
+import type {
+  APIGatewayProxyEventV2WithJWTAuthorizer,
+  APIGatewayProxyResultV2,
+} from "aws-lambda";
 import { PutCommand } from "@aws-sdk/lib-dynamodb";
 import { ddb, TABLE, linkKey } from "../lib/db.js";
 import { generateShortCode, normalizeUrl } from "../lib/shortcode.js";
@@ -9,13 +12,13 @@ const json = (statusCode: number, body: unknown): APIGatewayProxyResultV2 => ({
   body: JSON.stringify(body),
 });
 
-// Auth o bai 07; tam thoi gan owner co dinh.
-const OWNER = "user-001";
-
 // POST /links { "url": "https://..." } -> ghi link moi vao DynamoDB.
+// Route nay duoc JWT authorizer bao ve, nen claims luon co. ownerId = sub.
 export const handler = async (
-  event: APIGatewayProxyEventV2
+  event: APIGatewayProxyEventV2WithJWTAuthorizer
 ): Promise<APIGatewayProxyResultV2> => {
+  const OWNER = event.requestContext.authorizer?.jwt?.claims?.sub as string;
+  if (!OWNER) return json(401, { error: "thieu danh tinh nguoi dung" });
   let parsed: unknown;
   try {
     parsed = JSON.parse(event.body ?? "{}");
