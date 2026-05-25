@@ -50,6 +50,10 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
+      # Marker idempotency (CLICK#<eventId>) tu xoa sau khi het han nho TTL.
+      TimeToLiveSpecification:
+        AttributeName: ttl
+        Enabled: true
 
   UserPool:
     Type: AWS::Cognito::UserPool
@@ -216,8 +220,56 @@ Resources:
             Auth:
               Authorizer: CognitoAuthorizer
 
-  # Consumer tam thoi (bai 09): chi log su kien de chung minh flow. Bai 10 thay bang aggregator.
-  ClickLoggerFunction:
+  # DLQ: su kien xu ly that bai qua maxReceiveCount lan se roi vao day.
+  ClickDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: url-shortener-clicks-dlq
+      MessageRetentionPeriod: 1209600  # 14 ngay
+
+  # Hang doi dem giua EventBridge va aggregator. Cho phep batch + retry + DLQ.
+  ClickQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: url-shortener-clicks
+      VisibilityTimeout: 30
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt ClickDLQ.Arn
+        maxReceiveCount: 3
+
+  # Cho phep EventBridge gui message vao ClickQueue (chi tu rule cua ta).
+  ClickQueuePolicy:
+    Type: AWS::SQS::QueuePolicy
+    Properties:
+      Queues:
+        - !Ref ClickQueue
+      PolicyDocument:
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: events.amazonaws.com
+            Action: sqs:SendMessage
+            Resource: !GetAtt ClickQueue.Arn
+            Condition:
+              ArnEquals:
+                aws:SourceArn: !GetAtt ClickRule.Arn
+
+  # Rule tren custom bus: khop link.clicked -> day sang ClickQueue.
+  ClickRule:
+    Type: AWS::Events::Rule
+    Properties:
+      EventBusName: !Ref EventBus
+      EventPattern:
+        source:
+          - urlshortener
+        detail-type:
+          - link.clicked
+      Targets:
+        - Id: ClickQueueTarget
+          Arn: !GetAtt ClickQueue.Arn
+
+  # Aggregator that: dem click idempotent + partial batch failure.
+  ClickAggregatorFunction:
     Type: AWS::Serverless::Function
     Metadata:
       BuildMethod: esbuild
@@ -225,20 +277,24 @@ Resources:
         Minify: true
         Target: es2022
         EntryPoints:
-          - handlers/click-logger.ts
+          - handlers/click-aggregator.ts
     Properties:
       CodeUri: src
-      Handler: handlers/click-logger.handler
+      Handler: handlers/click-aggregator.handler
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref Table
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref Table
       Events:
-        Clicked:
-          Type: EventBridgeRule
+        Queue:
+          Type: SQS
           Properties:
-            EventBusName: !Ref EventBus
-            Pattern:
-              source:
-                - urlshortener
-              detail-type:
-                - link.clicked
+            Queue: !GetAtt ClickQueue.Arn
+            BatchSize: 10
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
 
 Outputs:
   ApiUrl:
