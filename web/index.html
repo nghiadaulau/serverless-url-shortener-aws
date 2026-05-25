@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>URL Shortener — Dashboard</title>
+<style>
+  :root { --bg:#0f1419; --card:#1a212b; --line:#2a3441; --fg:#e6edf3; --mut:#8b98a5; --acc:#3b82f6; --ok:#22c55e; }
+  * { box-sizing:border-box; }
+  body { margin:0; font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; background:var(--bg); color:var(--fg); }
+  .wrap { max-width:860px; margin:0 auto; padding:24px 16px 64px; }
+  h1 { font-size:22px; margin:0 0 4px; }
+  .sub { color:var(--mut); margin:0 0 24px; font-size:13px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px; margin-bottom:18px; }
+  label { display:block; font-size:12px; color:var(--mut); margin:0 0 4px; }
+  input { width:100%; padding:9px 11px; background:#0f1419; border:1px solid var(--line); border-radius:8px; color:var(--fg); font-size:14px; }
+  .row { display:flex; gap:10px; align-items:flex-end; flex-wrap:wrap; }
+  .row > div { flex:1; min-width:160px; }
+  button { padding:9px 16px; background:var(--acc); color:#fff; border:0; border-radius:8px; font-size:14px; cursor:pointer; white-space:nowrap; }
+  button.ghost { background:transparent; border:1px solid var(--line); color:var(--fg); }
+  button:disabled { opacity:.5; cursor:default; }
+  table { width:100%; border-collapse:collapse; margin-top:8px; }
+  th,td { text-align:left; padding:10px 8px; border-bottom:1px solid var(--line); font-size:14px; vertical-align:middle; }
+  th { color:var(--mut); font-weight:500; font-size:12px; }
+  .clicks { font-weight:700; font-size:18px; min-width:36px; display:inline-block; transition:color .2s; }
+  .bump { color:var(--ok); }
+  .code { font-family:ui-monospace,monospace; color:var(--acc); }
+  .tgt { color:var(--mut); font-size:12px; max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .msg { font-size:13px; padding:8px 11px; border-radius:8px; margin-top:10px; display:none; }
+  .msg.err { background:#3b1d1d; color:#fca5a5; display:block; }
+  .msg.ok { background:#16301f; color:#86efac; display:block; }
+  .hide { display:none; }
+  .dot { width:8px; height:8px; border-radius:50%; background:var(--mut); display:inline-block; margin-right:6px; }
+  .dot.live { background:var(--ok); box-shadow:0 0 6px var(--ok); }
+  details { margin-top:10px; } summary { color:var(--mut); font-size:12px; cursor:pointer; }
+  .cfg input { font-size:12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>🔗 URL Shortener</h1>
+  <p class="sub">Dashboard demo — đăng nhập, tạo link, và xem số click nhảy <b>realtime</b>.</p>
+
+  <!-- Login -->
+  <div class="card" id="loginCard">
+    <div class="row">
+      <div><label>Email</label><input id="email" value="demo@kkloudtarus.net" /></div>
+      <div><label>Mật khẩu</label><input id="pw" type="password" value="Demo-Pw-2026!" /></div>
+      <button id="loginBtn">Đăng nhập</button>
+    </div>
+    <div class="msg" id="loginMsg"></div>
+    <details class="cfg">
+      <summary>Cấu hình endpoint (đã điền sẵn)</summary>
+      <div style="margin-top:8px">
+        <label>API URL</label><input id="cfgApi" value="https://y066557668.execute-api.ap-southeast-1.amazonaws.com" />
+        <label style="margin-top:6px">WebSocket URL</label><input id="cfgWs" value="wss://koiee5rh2a.execute-api.ap-southeast-1.amazonaws.com/prod" />
+        <label style="margin-top:6px">Cognito Region / Client ID</label>
+        <div class="row"><div><input id="cfgRegion" value="ap-southeast-1" /></div><div><input id="cfgClient" value="npt0mqe59td0crkn65ahqhadd" /></div></div>
+      </div>
+    </details>
+  </div>
+
+  <!-- App -->
+  <div id="app" class="hide">
+    <div class="card">
+      <div class="row">
+        <div style="flex:3"><label>URL gốc cần rút gọn</label><input id="url" placeholder="https://..." value="https://kubernetes.io/docs/home/" /></div>
+        <button id="createBtn">Tạo link</button>
+        <button class="ghost" id="refreshBtn">Tải lại</button>
+        <button class="ghost" id="logoutBtn">Đăng xuất</button>
+      </div>
+      <div class="msg" id="appMsg"></div>
+    </div>
+
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <b>Link của bạn</b>
+        <span style="font-size:12px;color:var(--mut)"><span class="dot" id="liveDot"></span><span id="liveTxt">realtime</span></span>
+      </div>
+      <table>
+        <thead><tr><th>Mã</th><th>Đích</th><th>Click</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <p class="sub" style="margin-top:12px">Bấm <b>Click thử</b> để mô phỏng một lượt mở link — số Click sẽ nhảy ngay (xanh) nhờ WebSocket, không cần tải lại.</p>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let TOKEN = null, API, WS_URL, REGION, CLIENT, sockets = {};
+
+function cfg() {
+  API = $('cfgApi').value.replace(/\/$/, '');
+  WS_URL = $('cfgWs').value.replace(/\/$/, '');
+  REGION = $('cfgRegion').value.trim();
+  CLIENT = $('cfgClient').value.trim();
+}
+function show(el, txt, ok) { el.className = 'msg ' + (ok ? 'ok' : 'err'); el.textContent = txt; }
+
+async function login() {
+  cfg();
+  show($('loginMsg'), 'Đang đăng nhập...', true);
+  try {
+    const res = await fetch(`https://cognito-idp.${REGION}.amazonaws.com/`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/x-amz-json-1.1', 'x-amz-target': 'AWSCognitoIdentityProviderService.InitiateAuth' },
+      body: JSON.stringify({ AuthFlow: 'USER_PASSWORD_AUTH', ClientId: CLIENT,
+        AuthParameters: { USERNAME: $('email').value, PASSWORD: $('pw').value } })
+    });
+    const data = await res.json();
+    if (!data.AuthenticationResult) throw new Error(data.message || 'đăng nhập thất bại');
+    TOKEN = data.AuthenticationResult.IdToken;
+    $('loginCard').classList.add('hide');
+    $('app').classList.remove('hide');
+    listLinks();
+  } catch (e) { show($('loginMsg'), '✗ ' + e.message, false); }
+}
+
+async function api(path, opts = {}) {
+  const res = await fetch(API + path, { ...opts, headers: { 'content-type': 'application/json', 'Authorization': 'Bearer ' + TOKEN, ...(opts.headers||{}) } });
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  return res.status === 200 || res.status === 201 ? res.json() : null;
+}
+
+async function createLink() {
+  try {
+    await api('/links', { method: 'POST', body: JSON.stringify({ url: $('url').value }) });
+    show($('appMsg'), '✓ Đã tạo link', true);
+    listLinks();
+  } catch (e) { show($('appMsg'), '✗ ' + e.message, false); }
+}
+
+async function delLink(code) {
+  try { await api('/links/' + code, { method: 'DELETE' }); listLinks(); }
+  catch (e) { show($('appMsg'), '✗ ' + e.message, false); }
+}
+
+function watch(code) {
+  if (sockets[code]) return;
+  const ws = new WebSocket(`${WS_URL}?code=${code}`);
+  ws.onopen = () => { $('liveDot').classList.add('live'); };
+  ws.onmessage = ev => {
+    const d = JSON.parse(ev.data);
+    const cell = $('c_' + d.code);
+    if (cell) { cell.textContent = d.clicks; cell.classList.add('bump'); setTimeout(() => cell.classList.remove('bump'), 600); }
+  };
+  ws.onclose = () => { delete sockets[code]; };
+  sockets[code] = ws;
+}
+
+function clickTest(shortUrl) {
+  // Gui request mo link ma khong roi trang (count se nhay qua WebSocket)
+  fetch(shortUrl, { mode: 'no-cors', redirect: 'manual' }).catch(() => {});
+}
+
+async function listLinks() {
+  // dong cac socket cu
+  Object.values(sockets).forEach(s => s.close()); sockets = {};
+  const data = await api('/links');
+  const links = (data && data.links) || [];
+  $('rows').innerHTML = links.map(l => {
+    const short = `${API}/${l.code}`;
+    return `<tr>
+      <td><span class="code">${l.code}</span></td>
+      <td class="tgt" title="${l.target}">${l.target}</td>
+      <td><span class="clicks" id="c_${l.code}">${l.clicks ?? 0}</span></td>
+      <td style="text-align:right;white-space:nowrap">
+        <button class="ghost" onclick="clickTest('${short}')">Click thử</button>
+        <button class="ghost" onclick="window.open('${short}','_blank')">Mở</button>
+        <button class="ghost" onclick="delLink('${l.code}')">Xóa</button>
+      </td></tr>`;
+  }).join('') || '<tr><td colspan="4" style="color:var(--mut)">Chưa có link nào — tạo một cái ở trên.</td></tr>';
+  links.forEach(l => watch(l.code)); // mo WebSocket realtime cho moi link
+}
+
+$('loginBtn').onclick = login;
+$('createBtn').onclick = createLink;
+$('refreshBtn').onclick = listLinks;
+$('logoutBtn').onclick = () => location.reload();
+$('pw').addEventListener('keydown', e => { if (e.key === 'Enter') login(); });
+</script>
+</body>
+</html>
