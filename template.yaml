@@ -70,6 +70,12 @@ Resources:
     Properties:
       CodeUri: src
       Handler: handlers/create-link.handler
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref Table
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref Table
       Events:
         Create:
           Type: HttpApi
@@ -90,6 +96,12 @@ Resources:
     Properties:
       CodeUri: src
       Handler: handlers/resolve-link.handler
+      Environment:
+        Variables:
+          TABLE_NAME: !Ref Table
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref Table
       Events:
         Resolve:
           Type: HttpApi

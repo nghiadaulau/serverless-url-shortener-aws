@@ -3,6 +3,10 @@
   "version": "0.1.0",
   "description": "URL shortener with realtime analytics, built serverless on AWS with SAM + TypeScript",
   "license": "MIT",
+  "dependencies": {
+    "@aws-sdk/client-dynamodb": "^3.700.0",
+    "@aws-sdk/lib-dynamodb": "^3.700.0"
+  },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.145",
     "@types/node": "^22.10.0",
