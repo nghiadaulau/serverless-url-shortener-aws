@@ -301,6 +301,34 @@ Resources:
             FunctionResponseTypes:
               - ReportBatchItemFailures
 
+  # ---- Step Functions: kiem duyet link ----
+  ModerateCheckFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        EntryPoints:
+          - handlers/moderate-check.ts
+    Properties:
+      CodeUri: src
+      Handler: handlers/moderate-check.handler
+
+  LinkModerationStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Type: STANDARD
+      DefinitionUri: statemachine/moderation.asl.json
+      DefinitionSubstitutions:
+        ModerateCheckArn: !GetAtt ModerateCheckFunction.Arn
+        TableName: !Ref Table
+      Policies:
+        - LambdaInvokePolicy:
+            FunctionName: !Ref ModerateCheckFunction
+        - DynamoDBCrudPolicy:
+            TableName: !Ref Table
+
   # ---- WebSocket API (realtime push) ----
   WebSocketApi:
     Type: AWS::ApiGatewayV2::Api
@@ -399,6 +427,8 @@ Resources:
       SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${WebSocketApi}/*/*"
 
 Outputs:
+  ModerationStateMachineArn:
+    Value: !Ref LinkModerationStateMachine
   WebSocketUrl:
     Description: "URL WebSocket (them ?code=<code> khi ket noi)"
     Value: !Sub "wss://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
