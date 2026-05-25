@@ -150,8 +150,10 @@ function watch(code) {
 }
 
 function clickTest(shortUrl) {
-  // Gui request mo link ma khong roi trang (count se nhay qua WebSocket)
-  fetch(shortUrl, { mode: 'no-cors', redirect: 'manual' }).catch(() => {});
+  // Gui request mo link ma khong roi trang (count se nhay qua WebSocket).
+  // mode:'no-cors' BUOC redirect:'follow' (neu de 'manual' se nem TypeError).
+  // Click duoc ghi o server truoc khi tra 301, nen viec follow chi la phu.
+  fetch(shortUrl, { mode: 'no-cors' }).catch(() => {});
 }
 
 async function listLinks() {
