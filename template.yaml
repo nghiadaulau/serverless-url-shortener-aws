@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  serverless-url-shortener-aws — Part II, bai 03: HTTP API + route create/resolve + CORS.
+  serverless-url-shortener-aws — Part II, bai 04: them bang DynamoDB single-table.
 
 Globals:
   Function:
@@ -12,6 +12,24 @@ Globals:
     Timeout: 5
 
 Resources:
+  # Single-table: moi entity (link, stat...) song chung mot bang, phan biet bang
+  # tien to trong PK/SK. PK = phan vung, SK = sap xep trong phan vung.
+  Table:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: url-shortener
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+
   HttpApi:
     Type: AWS::Serverless::HttpApi
     Properties:
