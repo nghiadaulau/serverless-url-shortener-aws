@@ -154,6 +154,13 @@ Resources:
     Properties:
       CodeUri: src
       Handler: handlers/resolve-link.handler
+      FunctionName: !Sub "${AWS::StackName}-resolve"
+      # Canary: dich 10% traffic trong 5 phut roi 100%, tu rollback neu alarm loi keu.
+      AutoPublishAlias: live
+      DeploymentPreference:
+        Type: Canary10Percent5Minutes
+        Alarms:
+          - !Ref ResolveErrorAlarm
       Environment:
         Variables:
           TABLE_NAME: !Ref Table
@@ -341,7 +348,7 @@ Resources:
       MetricName: Throttles
       Dimensions:
         - Name: FunctionName
-          Value: !Ref ResolveLinkFunction
+          Value: !Sub "${AWS::StackName}-resolve"
       Statistic: Sum
       Period: 60
       EvaluationPeriods: 1
@@ -360,7 +367,7 @@ Resources:
       MetricName: Errors
       Dimensions:
         - Name: FunctionName
-          Value: !Ref ResolveLinkFunction
+          Value: !Sub "${AWS::StackName}-resolve"
       Statistic: Sum
       Period: 60
       EvaluationPeriods: 1

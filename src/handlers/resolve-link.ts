@@ -38,7 +38,7 @@ const lambdaHandler = async (
     })
   );
 
-  logger.info("link resolved", { code });
+  logger.info("link resolved", { code, v: 2 });
   metrics.addMetric("LinkResolved", MetricUnit.Count, 1);
   return { statusCode: 301, headers: { location: res.Item.target as string }, body: "" };
 };

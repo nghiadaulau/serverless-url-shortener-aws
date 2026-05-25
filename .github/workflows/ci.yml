@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# CI: build + validate moi push/PR. Khong can credentials AWS (sam validate --lint
+# chay offline bang cfn-lint). Phan CD (deploy) xem trong bai viet: dung OIDC -> AWS
+# roi sam deploy voi canary.
+env:
+  AWS_DEFAULT_REGION: ap-southeast-1
+
+jobs:
+  build-and-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+      - name: SAM build
+        run: sam build
+      - name: SAM validate (lint, offline)
+        run: sam validate --lint
