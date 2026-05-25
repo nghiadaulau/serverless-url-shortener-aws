@@ -86,6 +86,10 @@ Resources:
   HttpApi:
     Type: AWS::Serverless::HttpApi
     Properties:
+      # Throttle toan API: chong abuse / bao ve backend. Dat thap de demo 429.
+      DefaultRouteSettings:
+        ThrottlingBurstLimit: 2
+        ThrottlingRateLimit: 5
       CorsConfiguration:
         AllowOrigins:
           - "*"
@@ -124,8 +128,10 @@ Resources:
         Variables:
           TABLE_NAME: !Ref Table
       Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref Table
+        - Statement:
+            - Effect: Allow
+              Action: dynamodb:PutItem
+              Resource: !GetAtt Table.Arn
       Events:
         Create:
           Type: HttpApi
@@ -153,8 +159,10 @@ Resources:
           TABLE_NAME: !Ref Table
           EVENT_BUS: !Ref EventBus
       Policies:
-        - DynamoDBReadPolicy:
-            TableName: !Ref Table
+        - Statement:
+            - Effect: Allow
+              Action: dynamodb:GetItem
+              Resource: !GetAtt Table.Arn
         - EventBridgePutEventsPolicy:
             EventBusName: !Ref EventBus
       Events:
@@ -181,8 +189,12 @@ Resources:
         Variables:
           TABLE_NAME: !Ref Table
       Policies:
-        - DynamoDBReadPolicy:
-            TableName: !Ref Table
+        - Statement:
+            - Effect: Allow
+              Action: dynamodb:Query
+              Resource:
+                - !GetAtt Table.Arn
+                - !Sub "${Table.Arn}/index/GSI1"
       Events:
         List:
           Type: HttpApi
@@ -209,8 +221,10 @@ Resources:
         Variables:
           TABLE_NAME: !Ref Table
       Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref Table
+        - Statement:
+            - Effect: Allow
+              Action: dynamodb:DeleteItem
+              Resource: !GetAtt Table.Arn
       Events:
         Delete:
           Type: HttpApi
@@ -287,8 +301,17 @@ Resources:
           TABLE_NAME: !Ref Table
           WS_ENDPOINT: !Sub "https://${WebSocketApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
       Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref Table
+        - Statement:
+            - Effect: Allow
+              Action:
+                - dynamodb:UpdateItem
+                - dynamodb:PutItem
+                - dynamodb:GetItem
+                - dynamodb:DeleteItem
+                - dynamodb:Query
+              Resource:
+                - !GetAtt Table.Arn
+                - !Sub "${Table.Arn}/index/GSI1"
         - Statement:
             - Effect: Allow
               Action: execute-api:ManageConnections
@@ -398,8 +421,10 @@ Resources:
       Policies:
         - LambdaInvokePolicy:
             FunctionName: !Ref ModerateCheckFunction
-        - DynamoDBCrudPolicy:
-            TableName: !Ref Table
+        - Statement:
+            - Effect: Allow
+              Action: dynamodb:UpdateItem
+              Resource: !GetAtt Table.Arn
 
   # ---- WebSocket API (realtime push) ----
   WebSocketApi:
@@ -425,8 +450,10 @@ Resources:
         Variables:
           TABLE_NAME: !Ref Table
       Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref Table
+        - Statement:
+            - Effect: Allow
+              Action: dynamodb:PutItem
+              Resource: !GetAtt Table.Arn
 
   WsDisconnectFunction:
     Type: AWS::Serverless::Function
@@ -444,8 +471,10 @@ Resources:
         Variables:
           TABLE_NAME: !Ref Table
       Policies:
-        - DynamoDBCrudPolicy:
-            TableName: !Ref Table
+        - Statement:
+            - Effect: Allow
+              Action: dynamodb:DeleteItem
+              Resource: !GetAtt Table.Arn
 
   ConnectIntegration:
     Type: AWS::ApiGatewayV2::Integration
