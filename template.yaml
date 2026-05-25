@@ -12,6 +12,12 @@ Globals:
     Timeout: 5
 
 Resources:
+  # Custom event bus: tach su kien cua ung dung khoi default bus (cua AWS services).
+  EventBus:
+    Type: AWS::Events::EventBus
+    Properties:
+      Name: url-shortener-events
+
   # Single-table: moi entity (link, stat...) song chung mot bang, phan biet bang
   # tien to trong PK/SK. PK = phan vung, SK = sap xep trong phan vung.
   Table:
@@ -140,9 +146,12 @@ Resources:
       Environment:
         Variables:
           TABLE_NAME: !Ref Table
+          EVENT_BUS: !Ref EventBus
       Policies:
-        - DynamoDBCrudPolicy:
+        - DynamoDBReadPolicy:
             TableName: !Ref Table
+        - EventBridgePutEventsPolicy:
+            EventBusName: !Ref EventBus
       Events:
         Resolve:
           Type: HttpApi
@@ -206,6 +215,30 @@ Resources:
             Method: DELETE
             Auth:
               Authorizer: CognitoAuthorizer
+
+  # Consumer tam thoi (bai 09): chi log su kien de chung minh flow. Bai 10 thay bang aggregator.
+  ClickLoggerFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        EntryPoints:
+          - handlers/click-logger.ts
+    Properties:
+      CodeUri: src
+      Handler: handlers/click-logger.handler
+      Events:
+        Clicked:
+          Type: EventBridgeRule
+          Properties:
+            EventBusName: !Ref EventBus
+            Pattern:
+              source:
+                - urlshortener
+              detail-type:
+                - link.clicked
 
 Outputs:
   ApiUrl:
