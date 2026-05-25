@@ -302,6 +302,77 @@ Resources:
             FunctionResponseTypes:
               - ReportBatchItemFailures
 
+  # ---- CloudWatch: SNS + alarm + dashboard ----
+  AlarmTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: url-shortener-alarms
+
+  # SLO do tin cay: bao dong khi resolve bi throttle (vuot concurrency).
+  ResolveThrottleAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: url-shortener-resolve-throttles
+      AlarmDescription: "Resolve bi throttle - co the dang vuot gioi han concurrency"
+      Namespace: AWS/Lambda
+      MetricName: Throttles
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ResolveLinkFunction
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmTopic
+
+  # Bao dong khi resolve co loi (5xx phia ham).
+  ResolveErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: url-shortener-resolve-errors
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ResolveLinkFunction
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmTopic
+
+  Dashboard:
+    Type: AWS::CloudWatch::Dashboard
+    Properties:
+      DashboardName: url-shortener
+      DashboardBody: !Sub |
+        {
+          "widgets": [
+            {"type":"metric","x":0,"y":0,"width":12,"height":6,"properties":{
+              "title":"Resolve - invocations / errors / throttles","region":"${AWS::Region}",
+              "metrics":[
+                ["AWS/Lambda","Invocations","FunctionName","${ResolveLinkFunction}",{"stat":"Sum"}],
+                ["AWS/Lambda","Errors","FunctionName","${ResolveLinkFunction}",{"stat":"Sum"}],
+                ["AWS/Lambda","Throttles","FunctionName","${ResolveLinkFunction}",{"stat":"Sum"}]
+              ],"period":60}},
+            {"type":"metric","x":12,"y":0,"width":12,"height":6,"properties":{
+              "title":"Resolve - duration p50/p99","region":"${AWS::Region}",
+              "metrics":[
+                ["AWS/Lambda","Duration","FunctionName","${ResolveLinkFunction}",{"stat":"p50"}],
+                ["AWS/Lambda","Duration","FunctionName","${ResolveLinkFunction}",{"stat":"p99"}]
+              ],"period":60}},
+            {"type":"metric","x":0,"y":6,"width":12,"height":6,"properties":{
+              "title":"Click da dem (custom EMF)","region":"${AWS::Region}",
+              "metrics":[["UrlShortener","LinkResolved",{"stat":"Sum"}]],"period":60}}
+          ]
+        }
+
   # ---- Step Functions: kiem duyet link ----
   ModerateCheckFunction:
     Type: AWS::Serverless::Function
