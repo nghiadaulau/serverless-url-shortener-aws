@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: "2010-09-09"
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  serverless-url-shortener-aws — Part I, bai 01: ham Lambda dau tien + Function URL.
+  serverless-url-shortener-aws — Part II, bai 03: HTTP API + route create/resolve + CORS.
 
 Globals:
   Function:
@@ -12,23 +12,60 @@ Globals:
     Timeout: 5
 
 Resources:
-  HelloFunction:
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins:
+          - "*"
+        AllowMethods:
+          - GET
+          - POST
+          - OPTIONS
+        AllowHeaders:
+          - content-type
+
+  CreateLinkFunction:
     Type: AWS::Serverless::Function
     Metadata:
       BuildMethod: esbuild
       BuildProperties:
         Minify: true
         Target: es2022
-        Sourcemap: false
         EntryPoints:
-          - hello.ts
+          - handlers/create-link.ts
     Properties:
-      CodeUri: src/handlers
-      Handler: hello.handler
-      FunctionUrlConfig:
-        AuthType: NONE
+      CodeUri: src
+      Handler: handlers/create-link.handler
+      Events:
+        Create:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /links
+            Method: POST
+
+  ResolveLinkFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: esbuild
+      BuildProperties:
+        Minify: true
+        Target: es2022
+        EntryPoints:
+          - handlers/resolve-link.ts
+    Properties:
+      CodeUri: src
+      Handler: handlers/resolve-link.handler
+      Events:
+        Resolve:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /{code}
+            Method: GET
 
 Outputs:
-  HelloFunctionUrl:
-    Description: "Function URL cua HelloFunction"
-    Value: !GetAtt HelloFunctionUrl.FunctionUrl
+  ApiUrl:
+    Description: "URL goc cua HTTP API ($default stage)"
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"
