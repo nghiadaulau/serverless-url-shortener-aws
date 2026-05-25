@@ -20,6 +20,8 @@ jobs:
         with:
           node-version: 22
       - run: npm ci
+      # esbuild can o tren PATH cho SAM esbuild builder (CodeUri=src khong co node_modules rieng)
+      - run: npm install -g esbuild
       - uses: aws-actions/setup-sam@v2
         with:
           use-installer: true
