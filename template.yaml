@@ -24,11 +24,26 @@ Resources:
           AttributeType: S
         - AttributeName: SK
           AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
       KeySchema:
         - AttributeName: PK
           KeyType: HASH
         - AttributeName: SK
           KeyType: RANGE
+      # GSI1: tra cuu nguoc theo nguoi dung. Chi item co GSI1PK/GSI1SK moi vao
+      # index (sparse) -> chi link META vao day, STAT bi loai tu nhien.
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
 
   HttpApi:
     Type: AWS::Serverless::HttpApi
